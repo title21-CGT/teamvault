@@ -44,3 +44,5 @@
 - remote: https://github.com/title21-CGT/teamvault.git
   workspace: default
 
+- remote: https://shalom26@github.com/title21-CGT/cgt-frontend.git
+  workspace: default
