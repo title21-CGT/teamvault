@@ -223,6 +223,36 @@ launchctl kickstart -k "gui/$(id -u)/dev.teamvault.sidecar"
 
 If the user is running the sidecar manually (no launchd plist — e.g., dev sandbox), they'll need to restart it themselves: `Ctrl-C` the running `uvicorn` and re-launch.
 
+### 8.5. Deploy new/updated substrate skills to user-global
+
+The targeted-path checkout brought new and updated `teamvault-*` skills into `$SPACE_DIR/.claude/skills/`, but Claude Code looks in `~/.claude/skills/` (user-global, registered via `--scope user` at original install) for slash-command discovery. Copy them over so the new skills are invocable from any project the dev is in — without this step, slash commands like `/teamvault-upstream-sync` and `/teamvault-bind-project` only resolve when the user's cwd is inside the space dir, and existing `~/.claude/skills/teamvault-*` copies stay frozen on the version they were at install time.
+
+```bash
+mkdir -p "$HOME/.claude/skills"
+
+SUBSTRATE_SKILLS=(
+  teamvault-setup teamvault-status teamvault-publish teamvault-review
+  teamvault-doctor teamvault-upstream-sync teamvault-bind-project
+)
+DEPLOYED_GLOBAL=()
+
+for NAME in "${SUBSTRATE_SKILLS[@]}"; do
+  SRC="$SPACE_DIR/.claude/skills/$NAME"
+  DST="$HOME/.claude/skills/$NAME"
+  if [ -d "$SRC" ]; then
+    rm -rf "$DST"
+    cp -r "$SRC" "$DST"
+    DEPLOYED_GLOBAL+=("$NAME")
+  fi
+done
+
+echo "Deployed to ~/.claude/skills/: ${DEPLOYED_GLOBAL[*]}"
+```
+
+**Tell the user:** each substrate skill that landed in this sync has been re-copied to `~/.claude/skills/`. **Run `/quit` and relaunch Claude Code** to pick up the new + updated slash commands. The sidecar's MCP tools (`vault_search`, `vault_publish`, etc.) don't need a Claude Code restart — they were registered at `--scope user` during the original install and stay current via the sidecar's HTTP API.
+
+**Conflict policy:** this step OVERWRITES user-global substrate skill copies without prompting. The user invoked `/teamvault-upstream-sync` explicitly to pull substrate updates; that includes the skill files. Machine-local customizations to a `teamvault-*` skill should live elsewhere (e.g., in a `teamvault-*-custom/` directory) so they aren't overwritten by routine syncs.
+
 ### 9. Post-sync verification
 
 ```bash

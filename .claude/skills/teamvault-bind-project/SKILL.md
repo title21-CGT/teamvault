@@ -24,6 +24,20 @@ claude mcp list 2>/dev/null | grep -q teamvault \
 # Current directory is a git repo
 git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1 \
   || { echo "ERROR: $PWD is not a git repo. cd into the project you want to bind."; exit 1; }
+
+# Current directory is NOT the team space dir. Writing CLAUDE.md into the
+# space dir creates a dirty file the sidecar's git_sync halts on — empirically
+# observed during the 2026-06-25 Shalom demo where /teamvault-bind-project
+# was invoked with cwd == $SPACE_DIR and the resulting CLAUDE.md tripped the
+# "local changes block sync" halt. Bind operates on PROJECT repos, never on
+# the team space itself.
+if [ -f "$PWD/space.yaml" ]; then
+  echo "ERROR: $PWD looks like a TeamVault space directory (space.yaml present)."
+  echo "  /teamvault-bind-project operates on PROJECT repos, not the team space."
+  echo "  cd into the project repo you want to bind (e.g. ~/Projects/<my-app>),"
+  echo "  then re-run this skill."
+  exit 1
+fi
 ```
 
 If any check fails, **do not proceed** — `/teamvault-doctor` and `/teamvault-setup` are the right next steps.

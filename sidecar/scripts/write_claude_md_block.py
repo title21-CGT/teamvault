@@ -55,6 +55,12 @@ the knowledge domains the team has accumulated prior art on.
   paths_used, note)`. `paths_used=[]` is valid and records "we searched,
   nothing was useful." Always cite when you searched before a substantive
   decision.
+- After completing substantive work — closing a ticket, landing a fix,
+  capturing a decision, finishing a discovery session — call `vault_publish`
+  to record the decision / finding / pattern. The KB compounds from what
+  gets published; if every agent reads and never writes, the KB stays empty.
+  Default to publishing unless the work is genuinely trivial (typo fix,
+  version bump, dependency-only update).
 - For domain questions outside any enabled pack, demand-side rule applies:
   ask the KB whenever you'd ask a senior teammate.
 <!-- END teamvault-block -->"""
