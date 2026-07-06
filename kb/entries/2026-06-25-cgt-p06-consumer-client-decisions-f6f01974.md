@@ -65,3 +65,10 @@ Keeps the Part 11 form-audit trail clean and queryable; isolates the correlation
 
 - ClickUp 86ey2981h; PR title21-CGT/cgt-backend#30.
 - Related P06-adjacent services: CGT-P02 (audit/retention), CGT-P03 (service identity/secrets).
+
+## Update — 2026-07-06
+
+Two follow-ons changed some facts here — see `2026-07-06-cgt-p06-integrations-consolidation-and-webhooks.md`:
+
+- **Module paths moved.** The read/consumer path is now `src/integrations/middleware/` (was `src/integration/`), under a single `IntegrationsModule`. The unused CSV "discovery" mapping (`IntegrationField` / `IntegrationFieldMapping`) was deleted; `InstrumentFieldMapping` is the sole field-mapping mechanism. `IntegrationReadAudit` and `InstrumentCorrelation` (decisions 2 and 3 above) are unchanged, just relocated with the module.
+- **"No PHI on the wire" now has a push exception.** Still true for the pull path (DIN + productCode only). A new inbound `cases` webhook receives patient/transplant PHI and stores the raw body at rest in a new `WebhookNotification` table — accepted for the POC; retention / encryption / scrubbing are open follow-ups.
