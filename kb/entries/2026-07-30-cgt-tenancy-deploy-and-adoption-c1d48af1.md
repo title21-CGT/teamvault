@@ -97,21 +97,45 @@ Post-deploy the only remedy is SQL: `UPDATE "User" SET "isSuperAdmin" = true WHE
 
 Setting `RBAC_BOOTSTRAP_ADMINS` on every non-production environment regardless is cheap insurance.
 
-## The instance name is write-once
+## APP_INSTANCE_NAME is write-once, but the name is not
 
-`APP_INSTANCE_NAME` is read **only when the `Network` table is empty**, and all network write endpoints are
-deleted. Once a row exists, that env var is ignored forever and the top bar shows whatever name is stored.
-Renaming later is a SQL edit:
+`APP_INSTANCE_NAME` is read **only when the `Network` table is empty**. Once a row exists that env var is
+ignored forever, and the top bar shows whatever name is stored. Setting it on an environment that has already
+booted does nothing, which is the part that surprises people.
+
+**Correction (2026-07-30, later the same day).** This entry originally said all network write endpoints were
+deleted and that renaming was a SQL edit. That is no longer true. `PATCH /api/networks/current` renames the
+instance record, surfaced in the UI as a pencil beside the network name in Configure to Tenants. It is
+superadmin-only, and deliberately so by construction rather than by a new permission: it requires
+`tenants.manage`, which is in `GLOBAL_ONLY_PERMISSIONS` and outside the shell baseline, and the route carries
+no tenant guard, so `PermissionsGuard` resolves it against the baseline and only `fullAccess` passes. The
+write surface is the name alone; `status` and `metadata` are outside the DTO and `forbidNonWhitelisted` turns
+an attempt to set them into a 400.
+
+**A trap for anyone adding a second write route there.** `NetworksController` carries a class-level
+`@AuthOnly` so the GET stays open to every signed-in user (the name is chrome everyone renders). That single
+class-level decorator also satisfies `route-access-coverage.spec.ts` for *every* route on the controller, so
+a write route with a forgotten `@Permissions` passes CI green while being open to any authenticated user.
+Verified by mutation: with the decorator removed, `route-access-coverage.spec.ts` still reported 186/186
+passing. `tenant-guard-coverage.spec.ts` now pins every non-GET route on that controller separately, and
+`test/auth.e2e-spec.ts` asserts over real HTTP that a tenant role holding `tenants.manage` plus a spoofed
+`X-Tenant-Id` gets 403.
+
+Renaming in the database still works and is still the break-glass path if nobody has superadmin:
 
 ```sql
 UPDATE "Network" SET name = 'CGT Dev'
 WHERE id = (SELECT id FROM "Network" ORDER BY "createdAt" ASC LIMIT 1);
 ```
 
+Either way the boot path cannot clobber it: `ensureInstanceNetwork` returns early when the table is non-empty
+and never calls `network.update`, which a spec pins.
+
 Check `SELECT id, name, "createdAt" FROM "Network" ORDER BY "createdAt";` before deploying. Legacy
-environments may hold more than one row (networks used to be manageable); `GET /networks/current` picks the
-oldest deterministically and Tenancy Setup reports `networkCount` as a sanity signal. Because the frontend
-no longer filters tenants by network, every tenant appears under that one label regardless.
+environments may hold more than one row (networks used to be manageable); `GET /networks/current` and the
+rename both pick the oldest deterministically, so they always act on the row actually displayed, and Tenancy
+Setup reports `networkCount` as a sanity signal. Because the frontend no longer filters tenants by network,
+every tenant appears under that one label regardless.
 
 ## The manual pass, per environment
 
