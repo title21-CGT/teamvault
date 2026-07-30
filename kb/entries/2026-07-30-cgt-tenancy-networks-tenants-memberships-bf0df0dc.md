@@ -122,9 +122,27 @@ guards, so an unknown or non-member tenant is refused 403 by the permission chec
 can return its 400. That is intentional: it does not disclose whether a tenant exists to a caller with no
 access. Do not "fix" it.
 
-**Frontend corollary:** global admin surfaces (Users, Roles, Tenants, Feature Flags, Sources) gate on
-`isSuperAdmin`, **not** on `can(key)`. A tenant role may legitimately hold `users.manage` for its own
-members panel, and gating the tab on that would render a screen whose every request 403s.
+**Frontend corollary:** gate each **control** by the routes it calls, not each screen by its topic. A
+control hitting a global route gates on `isSuperAdmin`, **not** on `can(key)`: a tenant role may
+legitimately hold `users.manage`, and gating on that would render a control whose every request 403s.
+
+**Corrected 2026-07-30, later the same day.** This section originally listed Tenants alongside Users,
+Roles, Feature Flags and Sources as a surface to gate on `isSuperAdmin`, which contradicted the
+delegation rule two sections below and shipped as a bug: a tenant admin could not see Configure to
+Tenants at all. **Configure to Tenants is a MIXED surface.** Tenant CRUD and the network rename are
+global (superadmin); that tenant's own members panel is delegable and gates on `can('users.manage')`.
+The tab now opens for `isSuperAdmin || can('users.manage')` and `TenantsSettings` gates its two halves
+separately. Users, Roles, Feature Flags and Sources are unchanged: every route behind them is global.
+
+One asymmetry falls out of delegating members. Adding a member needs a user id, which only the global
+superadmin-only `GET /users` provides, so tenant admins get `POST /tenants/:tenantId/members/by-email`
+instead, and the frontend must gate its `['users', …]` query on `isSuperAdmin` (not on the members
+permission) or a tenant admin 403s there silently. A tenant admin can also provision a brand new account
+via `POST /tenants/:tenantId/members/create`; that route is tenant-scoped while creating a **platform**
+identity, so the service forces `isSuperAdmin: false` and a single membership in the URL's tenant, and
+`CreateMemberDto` omits both fields so `forbidNonWhitelisted` 400s an attempt to send them. Creation is
+an explicit second step after the by-email 404, never an automatic fallback: emails are globally unique,
+so auto-creating on a typo would permanently squat the correct address.
 
 ## Load-bearing rules
 
@@ -152,6 +170,14 @@ members panel, and gating the tab on that would render a screen whose every requ
 - **Divergent audit actors.** Eleven controllers each defined their own `actorOf`; two written during this
   work put `userId` first while nine used `email` first, quietly making `createdBy` a UUID on some routes
   and an email on others. Now one helper at `src/common/actor.ts`.
+- **A pre-tenancy "users are global" assumption surviving behind a tenant guard.**
+  `GET /api/equipment/assignable-users` sits on a `TenantContextGuard` controller, so it looks scoped and
+  `PermissionsGuard` treats it as scoped, but the service took no scope and returned **every enabled user
+  on the instance** with the raw email as a display-name fallback. It needs only `equipment.read`, which
+  `USER_BASE` grants, so the basic `user` role in any tenant could enumerate every account. Fixed by
+  filtering on `tenantMemberships: { some: { tenantId } }`. **Being behind a tenant guard is not the same
+  as being tenant-filtered**: the guard authorizes the caller, the service still has to scope the query.
+  Worth auditing any service method that takes no scope argument on a guarded controller.
 
 ## Open / known limitations
 
