@@ -18,6 +18,7 @@ description: TeamVault master template — fork to create your team space.
 # never blocks). Rename `your-org` to match your team (e.g., title-21).
 kingdoms:
   - your-org
+  - title21-CGT
 
 compliance: true            # true → auto-deploy disabled; pack updates require /teamvault-apply-pack-update
 enabled_packs:

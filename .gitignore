@@ -58,3 +58,6 @@ docs/PRD-v0.1.md
 
 # One-off comms briefs — per-tenant snapshots forwarded to specific teams (never tracked)
 SHALOM_BRIEF.md
+
+# Stray CLAUDE.md misfire from teamvault-bind-project — the bind block belongs in BOUND project repos, not in the space root
+CLAUDE.md
